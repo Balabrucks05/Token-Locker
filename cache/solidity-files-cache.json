@@ -302,8 +302,8 @@
       ]
     },
     "/home/balabrucks/Token-Locker/contracts/TokenLocker.sol": {
-      "lastModificationDate": 1734331305319,
-      "contentHash": "bbfbd165221521fc122ad31ba7fdb06c",
+      "lastModificationDate": 1734422415537,
+      "contentHash": "343521be51128f2a0337e9da6b90e9ee",
       "sourceName": "contracts/TokenLocker.sol",
       "solcConfig": {
         "version": "0.8.27",
