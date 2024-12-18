@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.27;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract TokenLocker is ReentrancyGuard, Ownable{
-    using SafeERC20 for IERC20;
+contract TokenLocker is ReentrancyGuardUpgradeable, OwnableUpgradeable,UUPSUpgradeable{
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     //Dynamic penalty fee (20% by default)
-    uint256 public penaltyPercentage = 5; //Initial penalty set to 5%
+    uint256 public penaltyPercentage;
     mapping(address => mapping(uint256 => uint256)) private userLockers;
 
 
@@ -72,10 +73,19 @@ contract TokenLocker is ReentrancyGuard, Ownable{
 
     event PenaltyFeeUpdated(uint256 oldFee, uint256 newFee);
 
-    constructor() {
-        //Set initial penalty fee to 5% when the contract is deployed
-        penaltyPercentage = 5;
+    //Constructor is removed, replaced with an initializer function
+    function initialize() public initializer{
+        __Ownable_init();
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
+        penaltyPercentage = 5; // Initial penalty set to 5%
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner{}
+    // constructor() {
+    //     //Set initial penalty fee to 5% when the contract is deployed
+    //     penaltyPercentage = 5;
+    // }
 
     // Function to update penalty fee percentage (only owner)
     function setPenaltyFeePercentage(uint256 newPercentage) external onlyOwner {
@@ -154,7 +164,7 @@ contract TokenLocker is ReentrancyGuard, Ownable{
         require(lock.isActive, "Cannot add funds to an inactive Lock");
 
         // Transfer tokens directly to the contract
-        IERC20(lock.tokenAddress).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20Upgradeable(lock.tokenAddress).safeTransferFrom(msg.sender, address(this), amount);
 
         //Update lock amount and user-specific record
         lock.amount += amount;
@@ -164,11 +174,6 @@ contract TokenLocker is ReentrancyGuard, Ownable{
         emit FundsAddedToLocker(msg.sender, lockId, amount, block.timestamp);
 
     }
-
-        function getAmount(address user, uint256 lockerId) public view returns (uint256) {
-           return userLockers[user][lockerId];
-       }
-
 
     /**
     * @dev Unlocks tokens if the lock period has ended (anyone can unlock after the lock ends)
@@ -185,7 +190,7 @@ contract TokenLocker is ReentrancyGuard, Ownable{
         lock.isActive = false;
 
         //Transfer tokens to the lock's owner
-        IERC20(lock.tokenAddress).safeTransfer(msg.sender, lock.amount);
+        IERC20Upgradeable(lock.tokenAddress).safeTransfer(msg.sender, lock.amount);
 
         // // Update user's locked balance
         // userBalances[lock.owner] -= lock.amount;
@@ -212,10 +217,10 @@ contract TokenLocker is ReentrancyGuard, Ownable{
         lock.isActive = false;
 
         // Transfer penalty amount to the contract owner
-        IERC20(lock.tokenAddress).safeTransfer(owner(), penaltyAmount);
+        IERC20Upgradeable(lock.tokenAddress).safeTransfer(owner(), penaltyAmount);
 
         // Transfer remaining tokens to lock owner
-        IERC20(lock.tokenAddress).safeTransfer(msg.sender, returnAmount);
+        IERC20Upgradeable(lock.tokenAddress).safeTransfer(msg.sender, returnAmount);
 
         // // Update user's locked balance
         // userBalances[lock.owner] -= lock.amount;
@@ -239,12 +244,17 @@ contract TokenLocker is ReentrancyGuard, Ownable{
         return userLocks;
     }
 
-    /**
-    * @dev Returns the total number of locks created
-    */
-    function getTotalLocks() public view returns(uint256){
-        return locks.length;
+    //Function to allow only the Owner to view all user locks
+    function getAllUserLocks() external view onlyOwner returns(Lock[] memory){
+        return locks;
     }
+
+    // /**
+    // * @dev Returns the total number of locks created
+    // */
+    // function getTotalLocks() public view returns(uint256){
+    //     return locks.length;
+    // }
 
     /**
     * @dev Returns the number of locks for a specific user
@@ -252,6 +262,11 @@ contract TokenLocker is ReentrancyGuard, Ownable{
     */
     function getUserLockCount(address user) external view returns(uint256) {
         return userLockIndices[user].length;
+    }
+
+     //Function to allow the owner to view the balance of a user in a specific token
+     function getUserTokenBalance(address token, address user) external view onlyOwner returns (uint256) {
+        return IERC20Upgradeable(token).balanceOf(user);
     }
 
     // /**
@@ -280,8 +295,7 @@ contract TokenLocker is ReentrancyGuard, Ownable{
     //     require(newPenaltyPercentage <= 100, "Penalty percentage cannot exceed 100");
     //     penaltyPercentage = newPenaltyPercentage;
     // }
-     function getUserTokenBalance(address token, address user) external view returns (uint256) {
-        return IERC20(token).balanceOf(user);
-    }
+
+   
 }
 
